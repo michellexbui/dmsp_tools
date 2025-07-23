@@ -15,15 +15,17 @@ def main():
     # =======
     sat_name = 'f17'
     date_str = '20100405'  # date in yyyymmdd format
-
-    # check if directory exists, if not make it
-    dir_exist('figures/energyflux/' + date_str)
-    dir_exist('figures/meanenergy/' + date_str)
     
     # extract info
     # ============
-    year = date_str[0:4]   # year
-    # get date of year
+    # directory check
+    path_energyflux = 'figures/energyflux/' + date_str + '/'
+    dir_exist(path_energyflux)
+    path_meanenergy = 'figures/meanenergy/' + date_str + '/'
+    dir_exist(path_meanenergy)
+        
+    # year and day-of-year
+    year = date_str[0:4]   
     date_fmt = '%Y%m%d'
     datetime_Ymd = dt.datetime.strptime(date_str, date_fmt)
     datetime_doy = datetime_Ymd.timetuple().tm_yday
@@ -44,79 +46,51 @@ def main():
         nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE  # value in a no data bin
         ut = ssusi['UT_N'][:]
         vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
-        
-        # energy flux
-        # ===========
-        image = vartmp[4,:,:]
-        energyflux_n = np.array(ssusi['ENERGY_FLUX_NORTH_MAP'])
-        fp = (ut == nodatavalue)
-        energyflux_n[fp] = np.nan
-        image[fp] = np.nan
-    
-        # get timestamp
-        starttime = ssusi.STARTING_TIME
-        stoptime = ssusi.STOPPING_TIME
-        yyyy = int(stoptime[:4])
-        ddd = int(stoptime[4:7])
-        date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-        timestamp = date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-    
-        if starttime[:7] != stoptime[:7]:
-            ut[ut > 20] = ut[ut > 20]-24 # MXB Q: what does this do?
-    
-        # set up plot
-        dataplot = energyflux_n
-        mlat = np.array(ssusi['LATITUDE_GEOMAGNETIC_GRID_MAP']) 
-        mlt = np.array(ssusi['MLT_GRID_MAP'])
-    
-        maxi = 15 # MXB Q: what does this mean physically
-        mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
-        
-        title = "Energy Flux Patterns"
-        cmap_str = "magma"
-        plot_SSUSI(dataplot,mlat,mlt,maxi,mini,timestamp,title, cmap_str)
-        
-        event_dt = timestamp.to_pydatetime()
-        plotname = event_dt.strftime('%Y%m%d_%H%M') + '_energyflux.png'
-        plt.savefig('figures/energyflux/' + plotname, dpi=150)
-    
-        # mean energy
-        # ===========
-        nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE  # value in a no data bin
-        ut = ssusi['UT_N'][:]
-        vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
-        
-        # get energy flux map
-        image = vartmp[4,:,:]
-        meanenergy_n = np.array(ssusi['ELECTRON_MEAN_NORTH_ENERGY_MAP'])
-        fp = (ut == nodatavalue)
-        meanenergy_n[fp] = np.nan
-        image[fp] = np.nan
-    
-        # get timestamp
-        starttime = ssusi.STARTING_TIME
-        stoptime = ssusi.STOPPING_TIME
-        yyyy = int(stoptime[:4])
-        ddd = int(stoptime[4:7])
-        date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-        timestamp = date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-    
-        # set up plot
-        dataplot = meanenergy_n
-        mlat = np.array(ssusi['LATITUDE_GEOMAGNETIC_GRID_MAP']) 
-        mlt = np.array(ssusi['MLT_GRID_MAP'])
-    
-        maxi = 6 # MXB Q: same what does this mean physically?
-        mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
-        
-        title = "Mean Energy Patterns"
-        cmap_str = "plasma"
-        plot_SSUSI(dataplot,mlat,mlt,maxi,mini,timestamp,title,cmap_str)
-        
-        event_dt = timestamp.to_pydatetime()
-        plotname = event_dt.strftime('%Y%m%d_%H%M') + '_meanenergy.png'
-        plt.savefig('figures/meanenergy/' + plotname, dpi=150)
 
+        for plottype in ['ENERGY_FLUX_NORTH_MAP','ELECTRON_MEAN_NORTH_ENERGY_MAP']:
+            image = vartmp[4,:,:]
+            energy_n = np.array(ssusi[plottype])
+            fp = (ut == nodatavalue)
+            energy_n[fp] = np.nan
+            image[fp] = np.nan
+        
+            # get timestamp
+            starttime = ssusi.STARTING_TIME
+            stoptime = ssusi.STOPPING_TIME
+            yyyy = int(stoptime[:4])
+            ddd = int(stoptime[4:7])
+            date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
+            timestamp = date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+        
+            if starttime[:7] != stoptime[:7]:
+                ut[ut > 20] = ut[ut > 20]-24 # MXB Q: what does this do?
+        
+            # set up plot
+            dataplot = energy_n
+            mlat = np.array(ssusi['LATITUDE_GEOMAGNETIC_GRID_MAP']) 
+            mlt = np.array(ssusi['MLT_GRID_MAP'])
+
+            if 'FLUX' in plottype:
+                title = "Energy Flux Patterns"
+                plotpath = path_energyflux
+                cmap_str = "magma"
+                maxi = 15 # MXB Q: what does this mean physically
+                mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
+            elif "MEAN" in plottype:
+                title = "Mean Energy Patterns"
+                cmap_str = "plasma"
+                plotpath = path_meanenergy
+                maxi = 6 # MXB Q: same what does this mean physically?
+                mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
+            else:
+                print("What the heck?")
+                break
+
+            # plot and save
+            plot_SSUSI(dataplot,mlat,mlt,maxi,mini,timestamp,title, cmap_str)
+            event_dt = timestamp.to_pydatetime()
+            plotname = event_dt.strftime('%Y%m%d_%H%M') + '_energyflux.png'
+            plt.savefig(plotpath + plotname, dpi=150)
 
 # polar plots
 # ===========
