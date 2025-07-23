@@ -32,9 +32,8 @@ import os
 def main():
     # inputs here!!
     # -------------
-    sat_name = 'f17'
-    str_dates = ['20100404','20100405','20100406',
-                 '20100407','20100408','20100409']
+    sat_name = str(input("Input satellite name as a string: e.g. $ f17\n")) 
+    str_dates = list(input("Input list of dates: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
 
     for date_str in str_dates: 
         # setup
