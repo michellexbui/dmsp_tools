@@ -18,6 +18,8 @@ This will generate figures located in `figures/meanenergy/YYYYMMDD/` and `figure
 
 Currently, `figures/` has some example figures for April 5, 2010.
 
+If you're looking for figures I've generated hop onto mia and check out mxbui/dmsp_tools/figures/
+mia has SSUSI data files from 2007-2020.
 
 **Here are some resources for DMSP data:** \
 Boston College DSMP Survey Plots: https://dmsp.bc.edu - survey plots, descriptions of all instruments, useful links \
