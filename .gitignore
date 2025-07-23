@@ -1,3 +1,3 @@
 .DS_Store
-figures/meanenergy/*.png
-figures/energyflux/*png
+figures/meanenergy/
+figures/energyflux/
