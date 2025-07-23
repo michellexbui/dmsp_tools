@@ -16,6 +16,8 @@ $ 20100404,20100405,20100406,20100407,20100408,20100409
 
 This will generate figures located in `figures/meanenergy/YYYYMMDD/` and `figures/energyflux/YYYYMMDD`, where YYYYMMDD is a directory for each date in your date list.
 
+Currently, `figures/` has some example figures for April 5, 2010.
+
 
 **Here are some resources for DMSP data:** \
 Boston College DSMP Survey Plots: https://dmsp.bc.edu - survey plots, descriptions of all instruments, useful links \
