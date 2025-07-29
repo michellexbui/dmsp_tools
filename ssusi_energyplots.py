@@ -83,7 +83,8 @@ def main():
                 yyyy = int(stoptime[:4])
                 ddd = int(stoptime[4:7])
                 date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-                timestamp = date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+                timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+                event_dt = timestamp.to_pydatetime()
             
                 if starttime[:7] != stoptime[:7]:
                     ut[ut > 20] = ut[ut > 20]-24 # MXB Q: what does this do?
@@ -100,23 +101,24 @@ def main():
                     cmap_str = "magma"
                     maxi = 15 # MXB Q: what does this mean physically
                     mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
+                    unit = r'$mW/m^2$'
                 elif "MEAN" in plottype:
                     title = "Mean Energy Patterns"
                     cmap_str = "plasma"
                     plotpath = path_meanenergy
                     maxi = 6 # MXB Q: same what does this mean physically?
                     mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
+                    unit = r'$keV$'
     
                 # plot
-                plot_SSUSI(dataplot,mlat,mlt,maxi,mini,timestamp,title, cmap_str)
-                event_dt = timestamp.to_pydatetime()
+                plot_SSUSI(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit)
                 plotname = event_dt.strftime('%Y%m%d_%H%M') + '_energyflux.png'
 
                 # output
                 # ------
                 plt.savefig(plotpath + plotname, dpi=150)
 
-def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str):
+def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str):
     #
     # OBJECTIVE 
     # - creates polar plots
@@ -124,17 +126,19 @@ def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str):
     # INPUT TYPES 
     # - array : image, mlat, mlt
     # - int : maxi, mini
-    # - pandas.Timestamp : time_stamp
-    # - str : name, cmap_str 
+    # - datetime.datetime : time_stamp
+    # - str : name, cmap_str, unit_str
     #
     # OUTPUT TYPES 
     # - fig : pyplot
     # 
     
     fig=plt.figure()
-    plt.subplots_adjust(left = 0.15,   right=0.85,
+    plt.subplots_adjust(bottom = 0.2,  top = 0.8,
                         wspace = 0.03, hspace = 0.03)
+    
     ax = fig.add_subplot(1,1,1,polar=True)
+    ax_cbar = ax.inset_axes([1, 0, 0.05, 0.3])
 
     # plot polar map
     theta = mlt*15.0*np.pi/180.0-np.pi/2
@@ -143,18 +147,24 @@ def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str):
     hs=ax.scatter(theta, rad, c=image,       s=0.5,
                               vmin=mini,     vmax=maxi,
                               cmap=cmap_str, alpha=0.6)
+    
     levels = [0.0,10,20,30,40]
-
     ax.set_rticks(levels)
     ax.set_rmax(40.0)
-    ax.set_yticklabels(['','','','','50'])
     ax.set_rlabel_position(22.5)
-    ax.set_xticks(np.arange(0,2*np.pi,np.pi/2.0))
-    ax.set_xticklabels(['06','12', '18', '00'])
-    ax.grid(True)
-    ax.set_title(name + "\n" + str(time_stamp))
 
-    fig.colorbar(hs,ax=ax,shrink=0.7)
+    ax.set_yticklabels(['N','80','70','60','']) # lat labels
+    ax.tick_params(axis='y', labelcolor='gray')
+
+    ax.set_xticks(np.arange(0,2*np.pi,np.pi/2.0)) # MLT labels
+    ax.set_xticklabels(['06','12', '18', '00 MLT'])
+
+    ax.grid(True)
+
+    timestamp_str = time_stamp.strftime('%Y-%m-%d %H:%M:%S')
+    ax.set_title(name + "\n" + timestamp_str + '\n \n')
+
+    fig.colorbar(hs, cax=ax_cbar, shrink=0.3, label=unit_str)
 
     return
 
@@ -173,7 +183,5 @@ def dir_exist(path):
     else:
         print(f'Dir exists: {path}')
     
-# main loop
-# =========
 if __name__=="__main__":
     main()

@@ -11,15 +11,15 @@ import matplotlib.pyplot as plt
 # inputs
 sat_name = 'F16' #DMSP satellite number
 lat_threshold = 60 # if we want to make high-latitude plots
-
 date_str = '20110926'               # date in yyyymmdd format
+
+year = date_str[0:4]
 DL_PATH = f'/backup/Data/DMSP/{year}/'  # Folder with DMSP files
 
 
 # Date formatting
 date_req = pd.to_datetime(date_str)      # convert to datetime object
 date_str_req = str(date_req.year) + str(date_req.month).rjust(2,'0') + str(date_req.day).rjust(2,'0')
-year = date_str[0:4]
 
 
 
