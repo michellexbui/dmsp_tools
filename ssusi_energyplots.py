@@ -32,10 +32,55 @@ import os
 def main():
     # inputs here!!
     # -------------
-    sat_name = str(input("Input satellite name as a string: e.g. $ f17\n")) 
-    str_dates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
+    satname = str(input("Input satellite name as a string: e.g. $ f17\n")) 
+    strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
 
-    for date_str in str_dates: 
+    # plot polar plots
+    #polar_plots(satname, strdates)
+
+    # hemispheric power
+    HPI = {}
+
+    for date_str in strdates:
+        dirpath = find_SSUSI_path(date_str,satname)
+
+        for filename in os.listdir(dirpath):
+            # check if .NC file
+            if filename.endswith('.NC') != True: 
+                continue # skips 1 iteration 
+
+            # get data
+            # --------
+            SSUSI_PATH = os.path.join(dirpath, filename) 
+            ssusi=Dataset(SSUSI_PATH)
+
+            datapoint = ssusi['HEMISPHERE_POWER_NORTH']
+            print(datapoint)
+
+            fill_value = getattr(datapoint, "_FillValue")
+            print(fill_value)
+            #print(type(datapoint)); 
+
+            # get timestamp
+            # -------------
+            ut = ssusi['UT_N'][:]
+            # no data isn't a NaN - it's an assigned number
+            nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE; 
+            fp = (ut == nodatavalue)
+            # MXB note: clean up...does event timestamp really depend on all of this?
+            vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
+            image = vartmp[4,:,:]; image[fp] = np.nan
+            event_dt = SSUSI_timestamp(ssusi,ut,image)
+
+            # assign HPI to timestamp
+            # -----------------------
+            #HPI.update({event_dt : datapoint})
+
+
+
+
+def polar_plots(sat_name, str_of_dates):
+    for date_str in str_of_dates: 
         # setup
         # -----
         # directory check and data path
@@ -43,22 +88,16 @@ def main():
         dir_exist(path_energyflux)
         path_meanenergy = 'figures/meanenergy/' + date_str + '/'
         dir_exist(path_meanenergy)
-            
-        # year and day-of-year
-        year = date_str[0:4]   
-        date_fmt = '%Y%m%d'
-        datetime_Ymd = dt.datetime.strptime(date_str, date_fmt)
-        datetime_doy = datetime_Ymd.timetuple().tm_yday
-        doy = f'{datetime_doy:03d}'
-        # SSUSI directory path
-        dirpath = f'/backup/Data/ssusi/data/ssusi.jhuapl.edu/dataN/{sat_name}/apl/edr-aur/{year}/{doy}/'
+        
+        #find path to SSUSI file
+        dirpath = find_SSUSI_path(date_str,sat_name)
     
         # search files & plot
         # -------------------
         for filename in os.listdir(dirpath):
             # check if .NC file
-            if filename.endswith('.NC') != True:
-                continue # skips 1 iteration
+            if filename.endswith('.NC') != True: 
+                continue # skips 1 iteration 
 
             # get data
             SSUSI_PATH = os.path.join(dirpath, filename) 
@@ -74,20 +113,11 @@ def main():
                 image = vartmp[4,:,:]
                 energy_n = np.array(ssusi[plottype])
                 fp = (ut == nodatavalue)
-                energy_n[fp] = np.nan
                 image[fp] = np.nan
+                energy_n[fp] = np.nan
             
                 # get timestamp
-                starttime = ssusi.STARTING_TIME
-                stoptime = ssusi.STOPPING_TIME
-                yyyy = int(stoptime[:4])
-                ddd = int(stoptime[4:7])
-                date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-                timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-                event_dt = timestamp.to_pydatetime()
-            
-                if starttime[:7] != stoptime[:7]:
-                    ut[ut > 20] = ut[ut > 20]-24 # MXB Q: what does this do?
+                event_dt = SSUSI_timestamp(ssusi,ut,image)
             
                 # set up plot
                 dataplot = energy_n
@@ -117,6 +147,7 @@ def main():
                 # output
                 # ------
                 plt.savefig(plotpath + plotname, dpi=150)
+
 
 def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str):
     #
@@ -168,6 +199,18 @@ def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str):
 
     return
 
+def find_SSUSI_path(date_str, sat_name):
+    # year and day-of-year
+        year = date_str[0:4]   
+        datetime_Ymd = dt.datetime.strptime(date_str, '%Y%m%d')
+        datetime_doy = datetime_Ymd.timetuple().tm_yday
+        doy = f'{datetime_doy:03d}'
+
+        # SSUSI directory path
+        path_to_dir = f'/backup/Data/ssusi/data/ssusi.jhuapl.edu/dataN/{sat_name}/apl/edr-aur/{year}/{doy}/'
+
+        return path_to_dir
+
 def dir_exist(path):
     #
     # OBJECTIVE 
@@ -182,6 +225,20 @@ def dir_exist(path):
         print(f'Created dir: {path}')
     else:
         print(f'Dir exists: {path}')
+
+def SSUSI_timestamp(ssusi,ut,image):
+    starttime = ssusi.STARTING_TIME
+    stoptime = ssusi.STOPPING_TIME
+    if starttime[:7] != stoptime[:7]:
+        ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
+
+    yyyy = int(stoptime[:4])
+    ddd = int(stoptime[4:7])
+    date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
+    timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+    eventdt = timestamp.to_pydatetime()   
+
+    return eventdt 
     
 if __name__=="__main__":
     main()

@@ -18,15 +18,17 @@ import numpy as np
 from apexpy import Apex
 from scipy.signal import find_peaks # to find the mlat extrema
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import datetime as dt
 
 def main():
     # inputs here!!
     # -------------
-    sat_name = 'F16' #DMSP satellite number
+    sat_name = 'F17' #DMSP satellite number
     lat_threshold = 60 # if we want to make high-latitude plots
     date_str = '20100405'               # date in yyyymmdd format
 
-    # set up
+    # set up        
     # ------
     year = date_str[0:4]
     DL_PATH = f'/backup/Data/DMSP/{year}/'  # Folder with DMSP files
@@ -38,9 +40,27 @@ def main():
     # plot 
     # ----
     newdf = get_dmsp_data(DL_PATH,date_str_req,sat_name)
-    # peak_times = get_dmsp_peak_times(newdf,lat_threshold)
-    # plt.plot(newdf['el_i_flux'])
+    peak_times = get_dmsp_peak_times(newdf,lat_threshold)
 
+    print(newdf.keys())
+    print(newdf['el_i_flux'])
+    #print(type(newdf['ion_i_flux'])) 
+    fig, ax = plt.subplots()
+    ax.plot((newdf['el_i_flux']+newdf['ion_i_flux']))
+    ax.set_title('Flux')
+
+    formatter = mpl.ticker.FuncFormatter(giga_formatter)
+    ax.yaxis.set_major_formatter(formatter)
+    ax.set_ylim(bottom=0.0)
+    ax.set_ylabel('Giga Units')
+
+    # Set the x-axis limits
+    ax.set_xlim(date_req, date_req + dt.timedelta(hours=23, minutes=59))
+    ax.set_xlabel(str(date_req.strftime('%Y-%m-%d')))
+    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
+    #plt.xticks(rotation = 45)
+    plt.savefig('dmsp_plots.png')
+    
 
 def get_dmsp_data(DL_PATH,date_str_req,sat_name):
     # Read DMSP data 
@@ -55,26 +75,34 @@ def get_dmsp_data(DL_PATH,date_str_req,sat_name):
 
 
 
-def read_hdf5_file(DL_PATH, date_str, file_type='drifts', # also works for 'precip'
-                   sat_list=None):
+def read_hdf5_file(DL_PATH, date_str, file_type='drifts', sat_list=None):
+    
     ds = {}
+    found_files = [] 
+    print(type(found_files))
 
     if file_type == 'drifts':
-        fl_nm_DMSP = os.path.join(DL_PATH, f"dms_{date_str}_s1")
+        for filename in os.listdir(DL_PATH):
+            if filename.startswith('dms_' + date_str) and filename.endswith('s1.001.hdf5') == True:
+                found_files.append(DL_PATH + str(filename))
+        # fl_nm_DMSP = os.path.join(DL_PATH, f"dms_{date_str}_s1")
     elif file_type == 'precip':
-        all_files = glob.glob(os.path.join(DL_PATH, f"dms_{date_str}_*"))
-        fl_nm_DMSP = [f for f in all_files if "s1" not in f]
-        
-    found_files = glob.glob(fl_nm_DMSP) if isinstance(fl_nm_DMSP, str) else fl_nm_DMSP
+        for filename in os.listdir(DL_PATH):
+            if filename.startswith('dms_' + date_str) and filename.endswith('s1.001.hdf5') != True:
+                found_files.append(DL_PATH + str(filename))
+        # all_files = glob.glob(os.path.join(DL_PATH, f"dms_{date_str}_*"))
+        # fl_nm_DMSP = [f for f in all_files if "s1" not in f]
+
+    # found_files = glob.glob(fl_nm_DMSP) if isinstance(fl_nm_DMSP, str) else fl_nm_DMSP
+    # print(found_files)
     
     for ifile in found_files:
-    
-        #print('Reading HDF5 file:', ifile)
+        # print('Reading HDF5 file:', ifile)
          # Extract satellite number
         satnum = ifile[ifile.rfind('_')+1:]
         satnum = satnum[:satnum.find('.')-1]
         satkey = 'F' + satnum
-        #print(satkey)
+        # print(satkey)
         if file_type == 'drifts':
             satkey = satkey[0:-1]
         elif file_type == 'precip':
@@ -82,7 +110,7 @@ def read_hdf5_file(DL_PATH, date_str, file_type='drifts', # also works for 'prec
         # Skip if sat_list is provided and this satkey is not in it
         if sat_list is not None and satkey not in sat_list:
             continue
-        
+ 
         if file_type == 'drifts':
             h5cols = ['year', 'month', 'day', 'hour', 'min', 'sec', 'recno',
                       'kindat', 'kinst', 'ut1_unix', 'ut2_unix',
@@ -108,10 +136,10 @@ def read_hdf5_file(DL_PATH, date_str, file_type='drifts', # also works for 'prec
             ds['dtime'] = ('timestamps', pd.to_datetime(ds.timestamps.values, unit='s'))
             ds = ds.swap_dims({'timestamps':'dtime'}).drop_vars('timestamps')
             df = ds.drop_dims('ch_energy').to_dataframe()
-
         #ds[satkey] = df
 
     return df
+
 
 
 
@@ -183,6 +211,8 @@ def get_dmsp_peak_times(newdf,lat_threshold):
     peak_times = [t.to_pydatetime() for t in peak_times_str]
     return peak_times
 
+def giga_formatter(x, pos):
+    return f'{x * 1e-9:.1f}'
 
 if __name__=="__main__":
     main()
