@@ -40,6 +40,7 @@ def main():
     # plot 
     # ----
     newdf = get_dmsp_data(DL_PATH,date_str_req,sat_name)
+    print(type(newdf))
     peak_times = get_dmsp_peak_times(newdf,lat_threshold)
 
     print(newdf.keys())

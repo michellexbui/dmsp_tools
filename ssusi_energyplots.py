@@ -25,6 +25,7 @@
 import numpy as np
 import datetime as dt
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import pandas as pd
 from netCDF4 import Dataset
 import os
@@ -39,7 +40,7 @@ def main():
     #polar_plots(satname, strdates)
 
     # hemispheric power
-    HPI = {}
+    HPI = {'time': [], 'hpi' : []}
 
     for date_str in strdates:
         dirpath = find_SSUSI_path(date_str,satname)
@@ -54,28 +55,30 @@ def main():
             SSUSI_PATH = os.path.join(dirpath, filename) 
             ssusi=Dataset(SSUSI_PATH)
 
-            datapoint = ssusi['HEMISPHERE_POWER_NORTH']
-            print(datapoint)
-
-            fill_value = getattr(datapoint, "_FillValue")
-            print(fill_value)
-            #print(type(datapoint)); 
-
-            # get timestamp
-            # -------------
-            ut = ssusi['UT_N'][:]
-            # no data isn't a NaN - it's an assigned number
-            nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE; 
-            fp = (ut == nodatavalue)
-            # MXB note: clean up...does event timestamp really depend on all of this?
-            vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
-            image = vartmp[4,:,:]; image[fp] = np.nan
-            event_dt = SSUSI_timestamp(ssusi,ut,image)
+            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'][0].item())
+            data_time_sec = float(ssusi['TIME'][0])
+            data_time_dt = dt.datetime.strptime(date_str, '%Y%m%d') + dt.timedelta(seconds=data_time_sec)
+            
+            print(f'At TIME: {data_time_dt}, HPI: {data_point} GW');
 
             # assign HPI to timestamp
             # -----------------------
-            #HPI.update({event_dt : datapoint})
+            HPI['time'].append(data_time_dt)
+            HPI['hpi'].append(data_point/2)
 
+
+    print(HPI)
+
+    fig, ax = plt.subplots()
+    ax.plot(HPI['time'], HPI['hpi'],'o-')
+    ax.set_title('DMSP-SSUSI Total Hemispheric Power')
+
+    ax.set_ylim(bottom=0.0)
+    ax.set_ylabel('GigaWatts')
+    ax.set_xlabel(f'{HPI['time'][0].strftime('%Y-%m-%d')} to {HPI['time'][-1].strftime('%Y-%m-%d')}')
+    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
+
+    plt.savefig('HPI.png')
 
 
 
@@ -117,7 +120,16 @@ def polar_plots(sat_name, str_of_dates):
                 energy_n[fp] = np.nan
             
                 # get timestamp
-                event_dt = SSUSI_timestamp(ssusi,ut,image)
+                starttime = ssusi.STARTING_TIME
+                stoptime = ssusi.STOPPING_TIME
+                if starttime[:7] != stoptime[:7]:
+                    ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
+
+                yyyy = int(stoptime[:4])
+                ddd = int(stoptime[4:7])
+                date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
+                timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+                event_dt = timestamp.to_pydatetime()   
             
                 # set up plot
                 dataplot = energy_n
@@ -226,19 +238,5 @@ def dir_exist(path):
     else:
         print(f'Dir exists: {path}')
 
-def SSUSI_timestamp(ssusi,ut,image):
-    starttime = ssusi.STARTING_TIME
-    stoptime = ssusi.STOPPING_TIME
-    if starttime[:7] != stoptime[:7]:
-        ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
-
-    yyyy = int(stoptime[:4])
-    ddd = int(stoptime[4:7])
-    date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-    timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-    eventdt = timestamp.to_pydatetime()   
-
-    return eventdt 
-    
 if __name__=="__main__":
     main()
