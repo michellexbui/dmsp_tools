@@ -67,15 +67,18 @@ def main():
             HPI['hpi'].append(data_point/2)
 
 
-    print(HPI)
+    HPI_df = pd.DataFrame.from_dict(HPI)
+    HPI_df = HPI_df.sort_values(by='time') # sort chronologically
+
+    print(HPI_df)
 
     fig, ax = plt.subplots()
-    ax.plot(HPI['time'], HPI['hpi'],'o-')
+    ax.plot(HPI_df['time'], HPI_df['hpi'],'o-')
     ax.set_title('DMSP-SSUSI Total Hemispheric Power')
 
     ax.set_ylim(bottom=0.0)
     ax.set_ylabel('GigaWatts')
-    ax.set_xlabel(f'{HPI['time'][0].strftime('%Y-%m-%d')} to {HPI['time'][-1].strftime('%Y-%m-%d')}')
+    ax.set_xlabel(f'{HPI_df['time'][0].strftime('%Y-%m-%d')} to {HPI_df['time'][HPI_df.index[-1]].strftime('%Y-%m-%d')}')
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
 
     plt.savefig('HPI.png')
