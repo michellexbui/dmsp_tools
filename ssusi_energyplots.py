@@ -35,6 +35,11 @@ def main():
     # -------------
     satname = str(input("Input satellite name as a string: e.g. $ f17\n")) 
     strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
+    #starttime = list(input("Input start time for the first date of the plot in HH:MM format: e.g. $ 20:00\n").split(':'))
+
+    # MXB Note: I want to start the plot at the input interested time
+    #plot_startdate = dt.datetime.strptime(strdates[0],'%Y%m%d') + dt.timedelta(hours=int(starttime[0]), minutes=int(starttime[1]))
+    #print(f'Start plot at {plot_startdate.strftime('%Y-%m-%d %H:%M')}')
 
     # plot polar plots
     #polar_plots(satname, strdates)
@@ -58,30 +63,33 @@ def main():
             data_point = float(ssusi['HEMISPHERE_POWER_NORTH'][0].item())
             data_time_sec = float(ssusi['TIME'][0])
             data_time_dt = dt.datetime.strptime(date_str, '%Y%m%d') + dt.timedelta(seconds=data_time_sec)
-            
-            print(f'At TIME: {data_time_dt}, HPI: {data_point} GW');
 
             # assign HPI to timestamp
             # -----------------------
             HPI['time'].append(data_time_dt)
             HPI['hpi'].append(data_point/2)
 
-
     HPI_df = pd.DataFrame.from_dict(HPI)
     HPI_df = HPI_df.sort_values(by='time') # sort chronologically
 
     print(HPI_df)
 
+    left_date = HPI_df['time'][0]
+    right_date = HPI_df['time'][HPI_df.index[-1]]
+
     fig, ax = plt.subplots()
-    ax.plot(HPI_df['time'], HPI_df['hpi'],'o-')
-    ax.set_title('DMSP-SSUSI Total Hemispheric Power')
+    ax.plot(HPI_df['time'], HPI_df['hpi'],'o-',color='red',label='DMSP-SSUSI')
+    ax.set_title('Total Hemispheric Power')
 
     ax.set_ylim(bottom=0.0)
+    ax.set_xlim(left=left_date, right=right_date)
     ax.set_ylabel('GigaWatts')
     ax.set_xlabel(f'{HPI_df['time'][0].strftime('%Y-%m-%d')} to {HPI_df['time'][HPI_df.index[-1]].strftime('%Y-%m-%d')}')
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
 
-    plt.savefig('HPI.png')
+    plt.grid(linestyle='--', color='gray', alpha=0.7)
+    plt.legend()
+    plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-HPI.png')
 
 
 
