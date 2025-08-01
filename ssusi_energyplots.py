@@ -34,10 +34,11 @@ def main():
     # inputs here!!
     # -------------
     satname = str(input("Input satellite name as a string: e.g. $ f17\n")) 
+    # *loop for all satellites!!
     strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
-    #starttime = list(input("Input start time for the first date of the plot in HH:MM format: e.g. $ 20:00\n").split(':'))
-
+    
     # MXB Note: I want to start the plot at the input interested time
+    #starttime = list(input("Input start time for the first date of the plot in HH:MM format: e.g. $ 20:00\n").split(':')
     #plot_startdate = dt.datetime.strptime(strdates[0],'%Y%m%d') + dt.timedelta(hours=int(starttime[0]), minutes=int(starttime[1]))
     #print(f'Start plot at {plot_startdate.strftime('%Y-%m-%d %H:%M')}')
 
@@ -55,7 +56,7 @@ def main():
             if filename.endswith('.NC') != True: 
                 continue # skips 1 iteration 
 
-            # get data
+            # get datap
             # --------
             SSUSI_PATH = os.path.join(dirpath, filename) 
             ssusi=Dataset(SSUSI_PATH)
@@ -67,7 +68,7 @@ def main():
             # assign HPI to timestamp
             # -----------------------
             HPI['time'].append(data_time_dt)
-            HPI['hpi'].append(data_point/2)
+            HPI['hpi'].append(data_point)
 
     HPI_df = pd.DataFrame.from_dict(HPI)
     HPI_df = HPI_df.sort_values(by='time') # sort chronologically
