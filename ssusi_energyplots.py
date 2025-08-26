@@ -13,10 +13,9 @@
 # - str_dates : [str, str, ...]  # where each str is formatted YYYYMMDD
 # 
 # MAIN OUTPUTS
-# - fig : 'figures/energyflux/YYYYMMDD/YYYYMMDD_HHMM_energyflux.png'
-# - fig : 'figures/meanenergy/YYYYMMDD/YYYYMMDD_HHMM_meanenergy.png'
 # 
 # FUNCTIONS 
+# - pickle_ssusi : unpacks a ssusi file
 # - plot_SSUSI : makes polar plots
 # - dir_exist : checks if a path exists, and creates if not
 # ====================
@@ -31,37 +30,88 @@ from netCDF4 import Dataset
 import os
 
 def main():
+    '''
+    About SSUSI files:
+    - 
+    '''
     # inputs here!!
     # -------------
-    satname = str(input("Input satellite name as a string: e.g. $ f17\n")) 
+    #strsats = list(input("Input list of satellite names as a string: e.g. $ f16, f17, f18\n").split(',')) 
     # *loop for all satellites!!
-    strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
+    #strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
     
+    #strdate = ['20100404','20100405','20100406']
+    strdates = ['20220203']
+    strsats = ['f17','f18']
+    '''
+    for satname in strsats:
+        dirpath = find_SSUSI_path(strdate[0],satname)
+        # search files & plot
+        # -------------------
+        for filename in os.listdir(dirpath):
+            print(filename)
+            # check if .NC file
+            if filename.endswith('.NC') != True: 
+                continue # skips 1 iteration 
+
+            # get data
+            SSUSI_PATH = os.path.join(dirpath, filename) 
+            ssusi=Dataset(SSUSI_PATH)
+            print(ssusi['HEMISPHERE_POWER_NORTH'][0])
+            print(ssusi)
+
+        print(ssusi)
+
+        HPI_plots(strdate,satname)
+        '''
+
     # MXB Note: I want to start the plot at the input interested time
     #starttime = list(input("Input start time for the first date of the plot in HH:MM format: e.g. $ 20:00\n").split(':')
     #plot_startdate = dt.datetime.strptime(strdates[0],'%Y%m%d') + dt.timedelta(hours=int(starttime[0]), minutes=int(starttime[1]))
     #print(f'Start plot at {plot_startdate.strftime('%Y-%m-%d %H:%M')}')
 
     # plot polar plots
-    #polar_plots(satname, strdates)
+    polar_plots(strsats, strdates)
 
+def pickle_ssusi(strlist_of_sats, strlist_of_dates):
+    # loop for each date
+    for date_str in strlist_of_dates:
+        # loop for each intended satellite 
+        for sat_name in strlist_of_sats:
+            # find path to SSUSI file
+            dirpath = find_SSUSI_path(date_str,sat_name)
+        
+            # search files & plot
+            # -------------------
+            for filename in os.listdir(dirpath):
+                # check if .NC file
+                if filename.endswith('.NC') != True: 
+                    continue # skips 1 iteration 
+
+                # get data
+                SSUSI_PATH = os.path.join(dirpath, filename) 
+                ssusi=Dataset(SSUSI_PATH)
+
+    return pickled_ssusi
+
+def HPI_plots(strdates,sat_name):
     # hemispheric power
     HPI = {'time': [], 'hpi' : []}
 
     for date_str in strdates:
-        dirpath = find_SSUSI_path(date_str,satname)
+        dirpath = find_SSUSI_path(date_str,sat_name)
 
         for filename in os.listdir(dirpath):
             # check if .NC file
             if filename.endswith('.NC') != True: 
                 continue # skips 1 iteration 
 
-            # get datap
+            # get data
             # --------
             SSUSI_PATH = os.path.join(dirpath, filename) 
             ssusi=Dataset(SSUSI_PATH)
 
-            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'][0].item())
+            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'][0])
             data_time_sec = float(ssusi['TIME'][0])
             data_time_dt = dt.datetime.strptime(date_str, '%Y%m%d') + dt.timedelta(seconds=data_time_sec)
 
@@ -74,106 +124,109 @@ def main():
     HPI_df = HPI_df.sort_values(by='time') # sort chronologically
 
     print(HPI_df)
-
-    left_date = HPI_df['time'][0]
+    
+    left_date = HPI_df['time'][1]
+    print(left_date)
     right_date = HPI_df['time'][HPI_df.index[-1]]
+    print(right_date)
 
     fig, ax = plt.subplots()
     ax.plot(HPI_df['time'], HPI_df['hpi'],'o-',color='red',label='DMSP-SSUSI')
-    ax.set_title('Total Hemispheric Power')
+    ax.set_title(f'Total Hemispheric Power ({sat_name})')
 
     ax.set_ylim(bottom=0.0)
     ax.set_xlim(left=left_date, right=right_date)
     ax.set_ylabel('GigaWatts')
-    ax.set_xlabel(f'{HPI_df['time'][0].strftime('%Y-%m-%d')} to {HPI_df['time'][HPI_df.index[-1]].strftime('%Y-%m-%d')}')
+    ax.set_xlabel(f'{left_date.strftime('%Y-%m-%d')} to {right_date.strftime('%Y-%m-%d')}')
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
 
     plt.grid(linestyle='--', color='gray', alpha=0.7)
     plt.legend()
-    plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-HPI.png')
+    plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-{sat_name}-HPI.png')
 
 
-
-def polar_plots(sat_name, str_of_dates):
-    for date_str in str_of_dates: 
-        # setup
-        # -----
-        # directory check and data path
-        path_energyflux = 'figures/energyflux/' + date_str + '/'
-        dir_exist(path_energyflux)
-        path_meanenergy = 'figures/meanenergy/' + date_str + '/'
-        dir_exist(path_meanenergy)
+def polar_plots(strlist_of_sats, strlist_of_dates):
+    for sat_name in strlist_of_sats:
+        # loop for each intended satellite
+        for date_str in strlist_of_dates: 
+            # setup
+            # -----
+            # check if a dir for that date exists 
+            path_energyflux = 'figures/energyflux/' + date_str + '/'
+            dir_exist(path_energyflux)
+            path_meanenergy = 'figures/meanenergy/' + date_str + '/'
+            dir_exist(path_meanenergy)
+            
+            # find path to SSUSI file
+            dirpath = find_SSUSI_path(date_str,sat_name)
         
-        #find path to SSUSI file
-        dirpath = find_SSUSI_path(date_str,sat_name)
-    
-        # search files & plot
-        # -------------------
-        for filename in os.listdir(dirpath):
-            # check if .NC file
-            if filename.endswith('.NC') != True: 
-                continue # skips 1 iteration 
+            # search files & plot
+            # -------------------
+            for filename in os.listdir(dirpath):
+                # check if .NC file
+                if filename.endswith('.NC') != True: 
+                    continue # skips 1 iteration 
 
-            # get data
-            SSUSI_PATH = os.path.join(dirpath, filename) 
-            ssusi=Dataset(SSUSI_PATH)
+                # get data
+                SSUSI_PATH = os.path.join(dirpath, filename) 
+                ssusi=Dataset(SSUSI_PATH)
 
-            nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE  # value in a no data bin
-            ut = ssusi['UT_N'][:]
-            vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
+                nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE  # value in a no data bin
+                ut = ssusi['UT_N'][:]
+                vartmp = np.array(ssusi['DISK_RADIANCEDATA_INTENSITY_NORTH'])
 
-            # make plots for energy flux and mean energy
-            for plottype in ['ENERGY_FLUX_NORTH_MAP',
-                             'ELECTRON_MEAN_NORTH_ENERGY_MAP']:
-                image = vartmp[4,:,:]
-                energy_n = np.array(ssusi[plottype])
-                fp = (ut == nodatavalue)
-                image[fp] = np.nan
-                energy_n[fp] = np.nan
-            
-                # get timestamp
-                starttime = ssusi.STARTING_TIME
-                stoptime = ssusi.STOPPING_TIME
-                if starttime[:7] != stoptime[:7]:
-                    ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
+                # make plots for energy flux and mean energy
+                for plottype in ['ENERGY_FLUX_NORTH_MAP',
+                                'ELECTRON_MEAN_NORTH_ENERGY_MAP']:
+                    image = vartmp[4,:,:]
+                    energy_n = np.array(ssusi[plottype])
+                    fp = (ut == nodatavalue)
+                    image[fp] = np.nan
+                    energy_n[fp] = np.nan
+                
+                    # get timestamp
+                    starttime = ssusi.STARTING_TIME
+                    stoptime = ssusi.STOPPING_TIME
+                    if starttime[:7] != stoptime[:7]:
+                        ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
 
-                yyyy = int(stoptime[:4])
-                ddd = int(stoptime[4:7])
-                date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-                timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-                event_dt = timestamp.to_pydatetime()   
-            
-                # set up plot
-                dataplot = energy_n
-                mlat = np.array(ssusi['LATITUDE_GEOMAGNETIC_GRID_MAP']) 
-                mlt = np.array(ssusi['MLT_GRID_MAP'])
+                    yyyy = int(stoptime[:4])
+                    ddd = int(stoptime[4:7])
+                    date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
+                    timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
+                    event_dt = timestamp.to_pydatetime()   
+                
+                    # set up plot
+                    dataplot = energy_n
+                    mlat = np.array(ssusi['LATITUDE_GEOMAGNETIC_GRID_MAP']) 
+                    mlt = np.array(ssusi['MLT_GRID_MAP'])
 
-                # titles / formatting
-                if 'FLUX' in plottype:
-                    title = "Energy Flux Patterns"
-                    plotpath = path_energyflux
-                    cmap_str = "magma"
-                    maxi = 15 # MXB Q: what does this mean physically
-                    mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
-                    unit = r'$mW/m^2$'
-                elif "MEAN" in plottype:
-                    title = "Mean Energy Patterns"
-                    cmap_str = "plasma"
-                    plotpath = path_meanenergy
-                    maxi = 6 # MXB Q: same what does this mean physically?
-                    mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
-                    unit = r'$keV$'
-    
-                # plot
-                plot_SSUSI(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit)
-                plotname = event_dt.strftime('%Y%m%d_%H%M') + '_energyflux.png'
+                    # titles / formatting
+                    if 'FLUX' in plottype:
+                        title = "Energy Flux Patterns"
+                        plotpath = path_energyflux
+                        cmap_str = "magma"
+                        maxi = 15 # MXB Q: what does this mean physically
+                        mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
+                        unit = r'$mW/m^2$'
+                    elif 'MEAN' in plottype:
+                        title = "Mean Energy Patterns"
+                        cmap_str = "plasma"
+                        plotpath = path_meanenergy
+                        maxi = 6 # MXB Q: same what does this mean physically?
+                        mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
+                        unit = r'$keV$'
+        
+                    # plot
+                    plot_SSUSI(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit, sat_name)
+                    plotname = event_dt.strftime('%Y%m%d_%H%M') + '-' + sat_name + '-energyflux.png'
 
-                # output
-                # ------
-                plt.savefig(plotpath + plotname, dpi=150)
+                    # output
+                    # ------
+                    plt.savefig(plotpath + plotname, dpi=150)
 
 
-def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str):
+def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
     #
     # OBJECTIVE 
     # - creates polar plots
@@ -217,7 +270,8 @@ def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str):
     ax.grid(True)
 
     timestamp_str = time_stamp.strftime('%Y-%m-%d %H:%M:%S')
-    ax.set_title(name + "\n" + timestamp_str + '\n \n')
+    ax.set_title(f'{name} ({sat_name})\n {timestamp_str} \n \n')
+    #ax.set_title(name + '(' + sat_name + ')' + "\n" + timestamp_str + '\n \n')
 
     fig.colorbar(hs, cax=ax_cbar, shrink=0.3, label=unit_str)
 
@@ -229,6 +283,7 @@ def find_SSUSI_path(date_str, sat_name):
         datetime_Ymd = dt.datetime.strptime(date_str, '%Y%m%d')
         datetime_doy = datetime_Ymd.timetuple().tm_yday
         doy = f'{datetime_doy:03d}'
+        print(doy)
 
         # SSUSI directory path
         path_to_dir = f'/backup/Data/ssusi/data/ssusi.jhuapl.edu/dataN/{sat_name}/apl/edr-aur/{year}/{doy}/'

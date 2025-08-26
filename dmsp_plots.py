@@ -44,6 +44,7 @@ def main():
     peak_times = get_dmsp_peak_times(newdf,lat_threshold)
 
     print(newdf.keys())
+    '''
     print(newdf['el_i_flux'])
     #print(type(newdf['ion_i_flux'])) 
     fig, ax = plt.subplots()
@@ -61,6 +62,7 @@ def main():
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
     #plt.xticks(rotation = 45)
     plt.savefig('dmsp_plots.png')
+    '''
     
 
 def get_dmsp_data(DL_PATH,date_str_req,sat_name):
