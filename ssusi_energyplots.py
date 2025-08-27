@@ -133,6 +133,7 @@ def HPI_plots(strdates,sat_name):
 def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
     for sat_name in strlist_of_sats:
         # loop for each intended satellite
+        dir_exist('figures/energyflux/{sat_name}/')
         for date_str in strlist_of_dates: 
             # setup
             # -----
