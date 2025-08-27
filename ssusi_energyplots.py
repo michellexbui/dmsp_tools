@@ -16,7 +16,7 @@
 # 
 # FUNCTIONS 
 # - pickle_ssusi : unpacks a ssusi file
-# - plot_SSUSI : makes polar plots
+# - plot_polar : makes polar plots
 # - dir_exist : checks if a path exists, and creates if not
 # ====================
 
@@ -30,19 +30,11 @@ from netCDF4 import Dataset
 import os
 
 def main():
-    '''
-    About SSUSI files:
-    - 
-    '''
-    # inputs here!!
-    # -------------
-    #strsats = list(input("Input list of satellite names as a string: e.g. $ f16, f17, f18\n").split(',')) 
-    # *loop for all satellites!!
-    #strdates = list(input("Input list of dates in YYYYMMDD format, split by a comma: e.g. $ 20100404,20100405,20100406,20100407,20100408,20100409\n").split(',')) 
-    
-    #strdate = ['20100404','20100405','20100406']
+    # PLOT SSUSI MAPS
     strdates = ['20220203']
-    strsats = ['f17','f18']
+    strsats = ['f17']
+    plot_SSUSImaps(strsats, strdates,'cdaweb')
+
     '''
     for satname in strsats:
         dirpath = find_SSUSI_path(strdate[0],satname)
@@ -64,14 +56,7 @@ def main():
 
         HPI_plots(strdate,satname)
         '''
-
-    # MXB Note: I want to start the plot at the input interested time
-    #starttime = list(input("Input start time for the first date of the plot in HH:MM format: e.g. $ 20:00\n").split(':')
-    #plot_startdate = dt.datetime.strptime(strdates[0],'%Y%m%d') + dt.timedelta(hours=int(starttime[0]), minutes=int(starttime[1]))
-    #print(f'Start plot at {plot_startdate.strftime('%Y-%m-%d %H:%M')}')
-
-    # plot polar plots
-    polar_plots(strsats, strdates)
+    
 
 def pickle_ssusi(strlist_of_sats, strlist_of_dates):
     # loop for each date
@@ -145,26 +130,26 @@ def HPI_plots(strdates,sat_name):
     plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-{sat_name}-HPI.png')
 
 
-def polar_plots(strlist_of_sats, strlist_of_dates):
+def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
     for sat_name in strlist_of_sats:
         # loop for each intended satellite
         for date_str in strlist_of_dates: 
             # setup
             # -----
             # check if a dir for that date exists 
-            path_energyflux = 'figures/energyflux/' + date_str + '/'
+            path_energyflux = f'figures/energyflux/{date_str}/'
             dir_exist(path_energyflux)
-            path_meanenergy = 'figures/meanenergy/' + date_str + '/'
+            path_meanenergy = f'figures/meanenergy/{date_str}/'
             dir_exist(path_meanenergy)
             
             # find path to SSUSI file
-            dirpath = find_SSUSI_path(date_str,sat_name)
-        
+            dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+            
             # search files & plot
             # -------------------
             for filename in os.listdir(dirpath):
                 # check if .NC file
-                if filename.endswith('.NC') != True: 
+                if filename.endswith('.NC') != True and filename.endswith('.nc') != True: 
                     continue # skips 1 iteration 
 
                 # get data
@@ -209,6 +194,7 @@ def polar_plots(strlist_of_sats, strlist_of_dates):
                         maxi = 15 # MXB Q: what does this mean physically
                         mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
                         unit = r'$mW/m^2$'
+                        name_type = 'ENERGYFLUX'
                     elif 'MEAN' in plottype:
                         title = "Mean Energy Patterns"
                         cmap_str = "plasma"
@@ -216,17 +202,20 @@ def polar_plots(strlist_of_sats, strlist_of_dates):
                         maxi = 6 # MXB Q: same what does this mean physically?
                         mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
                         unit = r'$keV$'
+                        name_type = 'MEANENERGY'
         
                     # plot
-                    plot_SSUSI(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit, sat_name)
-                    plotname = event_dt.strftime('%Y%m%d_%H%M') + '-' + sat_name + '-energyflux.png'
+                    plot_polar(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit, sat_name)
+                    plotname = f'{event_dt.strftime('%Y%m%d_%H%M')}-{sat_name}-{name_type}.png'
 
                     # output
                     # ------
                     plt.savefig(plotpath + plotname, dpi=150)
+            # permanently delete files
+            os.system(f'rm -r uplodat/{date_str}/')
 
 
-def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
+def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
     #
     # OBJECTIVE 
     # - creates polar plots
@@ -277,27 +266,75 @@ def plot_SSUSI(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_n
 
     return
 
-def find_SSUSI_path(date_str, sat_name):
-    # year and day-of-year
-        year = date_str[0:4]   
-        datetime_Ymd = dt.datetime.strptime(date_str, '%Y%m%d')
-        datetime_doy = datetime_Ymd.timetuple().tm_yday
-        doy = f'{datetime_doy:03d}'
-        print(doy)
 
+# ================== THIS IS FINE
+def find_SSUSI_path(date_str, sat_name, sourcename='mia'):
+    '''
+    OBJECTIVE
+    - find data from two different sources: 
+
+    INPUT
+    - date_str : str    
+        e.g. '20100405' : YYYYMMDD format
+    - sat_name : str    
+        e.g. 'f17'
+    - sourcename : str  
+        e.g. 'mia' or 'cdaweb'
+
+    OUTPUT
+    '''
+    # year and day-of-year
+    year = date_str[0:4]   
+    datetime_Ymd = dt.datetime.strptime(date_str, '%Y%m%d')
+    datetime_doy = datetime_Ymd.timetuple().tm_yday
+    doy = f'{datetime_doy:03d}'
+
+    if sourcename == 'mia':
         # SSUSI directory path
         path_to_dir = f'/backup/Data/ssusi/data/ssusi.jhuapl.edu/dataN/{sat_name}/apl/edr-aur/{year}/{doy}/'
+    elif sourcename == 'cdaweb':
+        # CHECK IF uplodat/ and uplodat/{date_str}/ exists
+        dir_exist('uplodat/')
+        dir_exist(f'uplodat/{date_str}')
 
-        return path_to_dir
+        # then upload data
+        urlstr = f'https://cdaweb.gsfc.nasa.gov/pub/data/dmsp/dmsp{sat_name}/ssusi/data/edr-aurora/{year}/{doy}/'
+        # wget index.html 
+        os.system(f'wget -P uplodat/{date_str}/ {urlstr}') 
+
+        # read index.html for filenames
+        filename = f'uplodat/{date_str}/index.html' ; files = []
+        with open(filename, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        lines = html_content.splitlines() 
+        for eachline in lines:
+            index_start = eachline.find('dmsp')
+            index_end = eachline.find('.nc')
+
+            if len(eachline[index_start:index_end+3]) > 0:
+                files.append(eachline[index_start:index_end+3])
+
+        # wget files into uplodat/{date_str}
+        for file in files:
+            os.system(f'wget -P uplodat/{date_str} {urlstr}{file}')
+        
+        # success u have the files!
+        path_to_dir = f'uplodat/{date_str}'
+
+    return path_to_dir
 
 def dir_exist(path):
-    #
-    # OBJECTIVE 
-    # - checks if a path exists. if not, creates that path.
-    #
-    # INPUT 
-    # - str : path     # e.g. 'figures/energyflux/20100405/'
-    # 
+    '''
+     OBJECTIVE 
+    - checks if a path to a directory exists. if not, creates that directory.
+    
+    INPUT 
+    - path : str    e.g. 'figures/energyflux/20100405/'
+                    path to the directory you are intersted in viewing
+
+    OUTPUT (none)
+    '''
     
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -307,3 +344,4 @@ def dir_exist(path):
 
 if __name__=="__main__":
     main()
+
