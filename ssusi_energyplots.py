@@ -26,16 +26,21 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
+import netCDF4
+import xarray as xr
 from netCDF4 import Dataset
 import os
+import aacgmv2
 
 def main():
-    # PLOT SSUSI MAPS
-    strdates = ['20220203']
-    strsats = ['f17']
-    plot_SSUSImaps(strsats, strdates,'cdaweb')
+    # this is sacred keep this # []
+    strdates = ['20110805','20110926','20111024','20120307','20120423','20120616','20120715','20120930','20121007','20121113','20130317','20130531','20130628','20220203','20220204','20240510']
+    strsats = ['f17','f18']
+    sourcename = 'cdaweb'
+    plot_SSUSImaps(strsats, strdates, sourcename)
 
     '''
+    i'm struggling here
     for satname in strsats:
         dirpath = find_SSUSI_path(strdate[0],satname)
         # search files & plot
@@ -56,35 +61,70 @@ def main():
 
         HPI_plots(strdate,satname)
         '''
+
+# playing around here:    
+
+# ==================== PICKLING HERE
+
+def pickle_ssusiday(date_str, dirpath):
+    # MXB NOTE: should a pickle have one dataset (i.e. 1 timestamp in 1 day) or should a pickle have multiple datasets within a day?
+    # whole day pickle
+    pklname = f'ssusi_{date_str}.pkl'
+    date_dataset = {}
+
+    # each file in the pickle jar
+    for filename in os.listdir(dirpath):
+        # check if .NC file
+        if filename.endswith('.NC') != True and filename.endswith('.nc') != True: 
+            continue # skips 1 iteration 
+
+        # get data
+        SSUSI_PATH = os.path.join(dirpath, filename) 
+        dataset = xr.open_dataset(SSUSI_PATH)
+
+        # append str day/time to dataset, formatted as 'YYYMMMHHMMSS'
+        date_dataset.update({dataset.STOPPING_TIME : dataset})
+
+    # write into a pickle
+    with open(pklname, 'wb') as f:
+        pickle.dump(date_dataset, f)
+
+    # MXB NOTE: do i need to close the file?
+    f.close()
     
+    # open as a read only
+    with open(pklname, 'rb') as file:
+        pickled_ssusiday = pickle.load(file)
 
-def pickle_ssusi(strlist_of_sats, strlist_of_dates):
-    # loop for each date
-    for date_str in strlist_of_dates:
-        # loop for each intended satellite 
-        for sat_name in strlist_of_sats:
-            # find path to SSUSI file
-            dirpath = find_SSUSI_path(date_str,sat_name)
-        
-            # search files & plot
-            # -------------------
-            for filename in os.listdir(dirpath):
-                # check if .NC file
-                if filename.endswith('.NC') != True: 
-                    continue # skips 1 iteration 
+    # return the data to be used
+    return pickled_ssusiday
 
-                # get data
-                SSUSI_PATH = os.path.join(dirpath, filename) 
-                ssusi=Dataset(SSUSI_PATH)
+def pickle_1ssusi(dirpath, filename):
+    # OBJECTIVE: pickle 1 dataset
+    SSUSI_PATH = os.path.join(dirpath, filename) 
+    dataset = xr.open_dataset(SSUSI_PATH)
 
-    return pickled_ssusi
+    str_timestamp = dataset.STOPPING_TIME
+    pklname = f'ssusi_{str_timestamp}.pkl'
 
-def HPI_plots(strdates,sat_name):
+    with open(pklname, 'wb') as f:
+        pickle.dump(dataset, f)
+
+    f.close() # MXB NOTE: do i need this? will it close auto?
+
+    with open(pklname, 'rb') as file:
+        pickled_1ssusi = pickle.load(file)
+    
+    return pickled_1ssusi
+
+# ==================== HPI...whats wrong
+
+def HPI_plots(strdates,sat_name,sourcename):
     # hemispheric power
     HPI = {'time': [], 'hpi' : []}
 
     for date_str in strdates:
-        dirpath = find_SSUSI_path(date_str,sat_name)
+        dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
 
         for filename in os.listdir(dirpath):
             # check if .NC file
@@ -130,22 +170,23 @@ def HPI_plots(strdates,sat_name):
     plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-{sat_name}-HPI.png')
 
 
+# ================== THIS IS SAFE FOR NOW
+
+
 def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
     for sat_name in strlist_of_sats:
         # loop for each intended satellite
-        dir_exist('figures/energyflux/{sat_name}/')
         for date_str in strlist_of_dates: 
             # setup
             # -----
             # check if a dir for that date exists 
-            path_energyflux = f'figures/energyflux/{date_str}/'
-            dir_exist(path_energyflux)
-            path_meanenergy = f'figures/meanenergy/{date_str}/'
-            dir_exist(path_meanenergy)
+            dir_exist(f'figures/energyflux/{date_str}/'); dir_exist(f'figures/energyflux/{date_str}/{sat_name}')
+            dir_exist(f'figures/meanenergy/{date_str}/') ; dir_exist(f'figures/meanenergy/{date_str}/{sat_name}')
             
             # find path to SSUSI file
+            # -----------------------
             dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
-            
+
             # search files & plot
             # -------------------
             for filename in os.listdir(dirpath):
@@ -170,6 +211,7 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     image[fp] = np.nan
                     energy_n[fp] = np.nan
                 
+                    # MXB NOTE: CHANGE THIS. Use stoptime str => datetime object
                     # get timestamp
                     starttime = ssusi.STARTING_TIME
                     stoptime = ssusi.STOPPING_TIME
@@ -190,7 +232,7 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     # titles / formatting
                     if 'FLUX' in plottype:
                         title = "Energy Flux Patterns"
-                        plotpath = path_energyflux
+                        plotpath = f'figures/energyflux/{date_str}/{sat_name}/'
                         cmap_str = "magma"
                         maxi = 15 # MXB Q: what does this mean physically
                         mini = 0  # MXB Note: I used Mukhopadhyay et al 2022 Fig 8a max/mins for this
@@ -199,7 +241,7 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     elif 'MEAN' in plottype:
                         title = "Mean Energy Patterns"
                         cmap_str = "plasma"
-                        plotpath = path_meanenergy
+                        plotpath = f'figures/meanenergy/{date_str}/{sat_name}/'
                         maxi = 6 # MXB Q: same what does this mean physically?
                         mini = 0 # MXB Note: I used Mukhopadhyay et al 2022 Fig 8b max/mins for this
                         unit = r'$keV$'
@@ -212,8 +254,10 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     # output
                     # ------
                     plt.savefig(plotpath + plotname, dpi=150)
-            # permanently delete files
-            os.system(f'rm -r uplodat/{date_str}/')
+
+            if sourcename == 'cdaweb':
+                # make space
+                os.system(f'rm -r uplodat/{date_str}/')
 
 
 def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
@@ -267,12 +311,12 @@ def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_n
 
     return
 
-
-# ================== THIS IS FINE
 def find_SSUSI_path(date_str, sat_name, sourcename='mia'):
     '''
     OBJECTIVE
-    - find data from two different sources: 
+    - find data from two different sources: mia or cdaweb. 
+    - if mia, output is the path to the mia data
+    - if cdaweb, it will wget cdaweb data and save into uplodat/{date_str}/. then output is the path to the uplodat/{date_str}/ data
 
     INPUT
     - date_str : str    
@@ -283,6 +327,8 @@ def find_SSUSI_path(date_str, sat_name, sourcename='mia'):
         e.g. 'mia' or 'cdaweb'
 
     OUTPUT
+    - path_to_dir : str
+        e.g. 'uplodat/{date_str}
     '''
     # year and day-of-year
     year = date_str[0:4]   
