@@ -24,6 +24,6 @@ If you're looking for data, mia has SSUSI data files from 2007-2020.
 **Here are some resources for DMSP data:** \
 Boston College DSMP Survey Plots: https://dmsp.bc.edu - survey plots, descriptions of all instruments, useful links \
 CEDAR Madrigal: https://cedar.openmadrigal.org/ \
-CDAWeb: https://cdaweb.gsfc.nasa.gov/  \
+CDAWeb: [https://cdaweb.gsfc.nasa.gov/pub/data/dmsp/](https://cdaweb.gsfc.nasa.gov/pub/data/dmsp/) \
 APL SSUSI:
 https://ssusi.jhuapl.edu - apparently the govt nuked this site ): 
