@@ -31,93 +31,17 @@ import xarray as xr
 from netCDF4 import Dataset
 import os
 import aacgmv2
+import pickle
 
 def main():
-    # this is sacred keep this # []
-    strdates = ['20110805','20110926','20111024','20120307','20120423','20120616','20120715','20120930','20121007','20121113','20130317','20130531','20130628','20220203','20220204','20240510']
-    strsats = ['f17','f18']
-    sourcename = 'cdaweb'
-    plot_SSUSImaps(strsats, strdates, sourcename)
+    # this is sacred keep this
+    strdates = ['20100405'] #['20110805','20110926','20111024','20120307','20120423','20120616','20120715','20120930','20121007','20121113','20130317','20130531','20130628','20220203','20220204','20240510']
+    strsats = ['f17'] #,'f18']
+    sourcename = 'mia'
+    plot_SSUSImaps_wpickle(strsats, strdates, sourcename) 
 
-    '''
-    i'm struggling here
-    for satname in strsats:
-        dirpath = find_SSUSI_path(strdate[0],satname)
-        # search files & plot
-        # -------------------
-        for filename in os.listdir(dirpath):
-            print(filename)
-            # check if .NC file
-            if filename.endswith('.NC') != True: 
-                continue # skips 1 iteration 
 
-            # get data
-            SSUSI_PATH = os.path.join(dirpath, filename) 
-            ssusi=Dataset(SSUSI_PATH)
-            print(ssusi['HEMISPHERE_POWER_NORTH'][0])
-            print(ssusi)
-
-        print(ssusi)
-
-        HPI_plots(strdate,satname)
-        '''
-
-# playing around here:    
-
-# ==================== PICKLING HERE
-
-def pickle_ssusiday(date_str, dirpath):
-    # MXB NOTE: should a pickle have one dataset (i.e. 1 timestamp in 1 day) or should a pickle have multiple datasets within a day?
-    # whole day pickle
-    pklname = f'ssusi_{date_str}.pkl'
-    date_dataset = {}
-
-    # each file in the pickle jar
-    for filename in os.listdir(dirpath):
-        # check if .NC file
-        if filename.endswith('.NC') != True and filename.endswith('.nc') != True: 
-            continue # skips 1 iteration 
-
-        # get data
-        SSUSI_PATH = os.path.join(dirpath, filename) 
-        dataset = xr.open_dataset(SSUSI_PATH)
-
-        # append str day/time to dataset, formatted as 'YYYMMMHHMMSS'
-        date_dataset.update({dataset.STOPPING_TIME : dataset})
-
-    # write into a pickle
-    with open(pklname, 'wb') as f:
-        pickle.dump(date_dataset, f)
-
-    # MXB NOTE: do i need to close the file?
-    f.close()
-    
-    # open as a read only
-    with open(pklname, 'rb') as file:
-        pickled_ssusiday = pickle.load(file)
-
-    # return the data to be used
-    return pickled_ssusiday
-
-def pickle_1ssusi(dirpath, filename):
-    # OBJECTIVE: pickle 1 dataset
-    SSUSI_PATH = os.path.join(dirpath, filename) 
-    dataset = xr.open_dataset(SSUSI_PATH)
-
-    str_timestamp = dataset.STOPPING_TIME
-    pklname = f'ssusi_{str_timestamp}.pkl'
-
-    with open(pklname, 'wb') as f:
-        pickle.dump(dataset, f)
-
-    f.close() # MXB NOTE: do i need this? will it close auto?
-
-    with open(pklname, 'rb') as file:
-        pickled_1ssusi = pickle.load(file)
-    
-    return pickled_1ssusi
-
-# ==================== HPI...whats wrong
+# ==================== HPI...whats wrong...
 
 def HPI_plots(strdates,sat_name,sourcename):
     # hemispheric power
@@ -170,8 +94,59 @@ def HPI_plots(strdates,sat_name,sourcename):
     plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-{sat_name}-HPI.png')
 
 
-# ================== THIS IS SAFE FOR NOW
+# ==================== PICKLING HERE
+# yipee we incorporated pickles
 
+def pickle_ssusiday(date_str, dirpath):
+    # MXB NOTE: should a pickle have one dataset (i.e. 1 timestamp in 1 day) or should a pickle have multiple datasets within a day?
+    # whole day pickle
+    pklname = f'ssusi_{date_str}.pkl'
+    date_dataset = {}
+
+    # each file in the pickle jar
+    for filename in os.listdir(dirpath):
+        # check if .NC file
+        if filename.endswith('.NC') != True and filename.endswith('.nc') != True: 
+            continue # skips 1 iteration 
+
+        # get data
+        SSUSI_PATH = os.path.join(dirpath, filename) 
+        dataset = xr.open_dataset(SSUSI_PATH)
+
+        # append str day/time to dataset, formatted as 'YYYMMMHHMMSS'
+        date_dataset.update({dataset.STOPPING_TIME : dataset})
+
+    # write into a pickle
+    with open(pklname, 'wb') as f:
+        pickle.dump(date_dataset, f)
+
+    # MXB NOTE: do i need to close the file?
+    f.close()
+    
+    # open as a read only
+    with open(pklname, 'rb') as file:
+        pickled_ssusiday = pickle.load(file)
+
+    # return the data to be used
+    return pickled_ssusiday
+
+def pickle_1ssusi(dirpath, filename):
+    # OBJECTIVE: pickle 1 dataset
+    SSUSI_PATH = os.path.join(dirpath, filename) 
+    dataset = xr.open_dataset(SSUSI_PATH)
+
+    str_timestamp = dataset.STOPPING_TIME
+    pklname = f'ssusi_{str_timestamp}.pkl'
+
+    with open(pklname, 'wb') as f:
+        pickle.dump(dataset, f)
+
+    f.close() # MXB NOTE: do i need this? will it close auto?
+
+    with open(pklname, 'rb') as file:
+        pickled_1ssusi = pickle.load(file)
+    
+    return pickled_1ssusi
 
 def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
     for sat_name in strlist_of_sats:
@@ -187,16 +162,11 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
             # -----------------------
             dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
 
-            # search files & plot
-            # -------------------
-            for filename in os.listdir(dirpath):
-                # check if .NC file
-                if filename.endswith('.NC') != True and filename.endswith('.nc') != True: 
-                    continue # skips 1 iteration 
+            #===
+            pickled_ssusi = pickle_ssusiday(date_str, dirpath)
 
-                # get data
-                SSUSI_PATH = os.path.join(dirpath, filename) 
-                ssusi=Dataset(SSUSI_PATH)
+            for eventtime in pickled_ssusi.keys():
+                ssusi = pickled_ssusi[eventtime]
 
                 nodatavalue = ssusi.NO_DATA_IN_BIN_VALUE  # value in a no data bin
                 ut = ssusi['UT_N'][:]
@@ -211,18 +181,16 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     image[fp] = np.nan
                     energy_n[fp] = np.nan
                 
-                    # MXB NOTE: CHANGE THIS. Use stoptime str => datetime object
+                    # MXB NOTE: CHANGE THIS. Use starttime str => datetime object
                     # get timestamp
                     starttime = ssusi.STARTING_TIME
                     stoptime = ssusi.STOPPING_TIME
-                    if starttime[:7] != stoptime[:7]:
-                        ut[ut > 20] = ut[ut > 20]-24 # limits data within 1 day
 
                     yyyy = int(stoptime[:4])
                     ddd = int(stoptime[4:7])
                     date = pd.Timestamp(yyyy, 1, 1)+pd.Timedelta(ddd-1, 'D')
-                    timestamp =  date+pd.Timedelta(np.nanmean(ut[image==image]),'h')
-                    event_dt = timestamp.to_pydatetime()   
+
+                    event_dt = dt.datetime.strptime(starttime, '%Y%j%H%M%S')
                 
                     # set up plot
                     dataplot = energy_n
@@ -254,11 +222,11 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
                     # output
                     # ------
                     plt.savefig(plotpath + plotname, dpi=150)
+                    plt.close() 
 
             if sourcename == 'cdaweb':
                 # make space
                 os.system(f'rm -r uplodat/{date_str}/')
-
 
 def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
     #

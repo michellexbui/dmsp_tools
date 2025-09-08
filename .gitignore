@@ -1,4 +1,6 @@
 .DS_Store
 figures/
 testcode.ipynb
+dmsptest.ipynb
 uplodat/
+*.pkl
