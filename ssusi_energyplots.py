@@ -34,11 +34,18 @@ import aacgmv2
 import pickle
 
 def main():
-    # this is sacred keep this
+
+    strdates = ['20100405']
+    satname = 'f17'
+    sourcename = 'mia'
+    HPI_plots(strdates, satname, sourcename)
+
+
+"""     # this is sacred keep this
     strdates = ['20100405'] #['20110805','20110926','20111024','20120307','20120423','20120616','20120715','20120930','20121007','20121113','20130317','20130531','20130628','20220203','20220204','20240510']
     strsats = ['f17'] #,'f18']
     sourcename = 'mia'
-    plot_SSUSImaps_wpickle(strsats, strdates, sourcename) 
+    plot_SSUSImaps(strsats, strdates, sourcename)  """
 
 
 # ==================== HPI...whats wrong...
@@ -49,19 +56,15 @@ def HPI_plots(strdates,sat_name,sourcename):
 
     for date_str in strdates:
         dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+        pickled_ssusi = pickle_ssusiday(date_str, dirpath)
 
-        for filename in os.listdir(dirpath):
-            # check if .NC file
-            if filename.endswith('.NC') != True: 
-                continue # skips 1 iteration 
+        # use ssusi pickle
+        # ----------------
+        for eventtime in pickled_ssusi.keys():
+            ssusi = pickled_ssusi[eventtime]
 
-            # get data
-            # --------
-            SSUSI_PATH = os.path.join(dirpath, filename) 
-            ssusi=Dataset(SSUSI_PATH)
-
-            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'][0])
-            data_time_sec = float(ssusi['TIME'][0])
+            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'])
+            data_time_sec = float(ssusi['TIME'])
             data_time_dt = dt.datetime.strptime(date_str, '%Y%m%d') + dt.timedelta(seconds=data_time_sec)
 
             # assign HPI to timestamp
@@ -75,9 +78,7 @@ def HPI_plots(strdates,sat_name,sourcename):
     print(HPI_df)
     
     left_date = HPI_df['time'][1]
-    print(left_date)
     right_date = HPI_df['time'][HPI_df.index[-1]]
-    print(right_date)
 
     fig, ax = plt.subplots()
     ax.plot(HPI_df['time'], HPI_df['hpi'],'o-',color='red',label='DMSP-SSUSI')
@@ -148,7 +149,7 @@ def pickle_1ssusi(dirpath, filename):
     
     return pickled_1ssusi
 
-def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
+def plot_SSUSImaps(strlist_of_sats, strlist_of_dates, sourcename='mia'):
     for sat_name in strlist_of_sats:
         # loop for each intended satellite
         for date_str in strlist_of_dates: 
@@ -158,13 +159,13 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates,sourcename='mia'):
             dir_exist(f'figures/energyflux/{date_str}/'); dir_exist(f'figures/energyflux/{date_str}/{sat_name}')
             dir_exist(f'figures/meanenergy/{date_str}/') ; dir_exist(f'figures/meanenergy/{date_str}/{sat_name}')
             
-            # find path to SSUSI file
-            # -----------------------
+            # find path to SSUSI file & pickle it
+            # -----------------------------------
             dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
-
-            #===
             pickled_ssusi = pickle_ssusiday(date_str, dirpath)
 
+            # use ssusi pickle
+            # ----------------
             for eventtime in pickled_ssusi.keys():
                 ssusi = pickled_ssusi[eventtime]
 
