@@ -1,24 +1,9 @@
-# ====================
-# ssusi_energyplots.py
-#
-# ABOUT ME
-# - Using DMSP-SSUSI data files (.NC), we can plot polar energy flux and mean energy maps for a day.
-#   DMSP-SSUSI files are located in mia (defined in main as 'dirpath').
-# - You need to plug in the satellite name and a list of dates.
-#   The main loop will search for the SSUSI data files for that date and plot pretty polar pictures.
-#   These pics are saved in 'figures/' + [data type i.e. meanenergy or energyflux] + /YYYYMMDD
-# 
-# MAIN INPUTS 
-# - sat_name : str               # sat_name: pick from ['f16','f17','f18']
-# - str_dates : [str, str, ...]  # where each str is formatted YYYYMMDD
-# 
-# MAIN OUTPUTS
-# 
-# FUNCTIONS 
-# - pickle_ssusi : unpacks a ssusi file
-# - plot_polar : makes polar plots
-# - dir_exist : checks if a path exists, and creates if not
-# ====================
+'''
+Objective: Access DMSP SSUSI EDR products and utilize for model validation 
+
+Examples
+--------
+'''
 
 
 import numpy as np
@@ -30,78 +15,110 @@ import netCDF4
 import xarray as xr
 from netCDF4 import Dataset
 import os
-import aacgmv2
 import pickle
 
 def main():
-
-    strdates = ['20100405']
-    satname = 'f17'
-    sourcename = 'mia'
-    HPI_plots(strdates, satname, sourcename)
+    # just get the pickle : see example in pickle_ssusiday
+    # get ssusi maps : see example in plot_SSUSImaps
 
 
-"""     # this is sacred keep this
-    strdates = ['20100405'] #['20110805','20110926','20111024','20120307','20120423','20120616','20120715','20120930','20121007','20121113','20130317','20130531','20130628','20220203','20220204','20240510']
-    strsats = ['f17'] #,'f18']
-    sourcename = 'mia'
-    plot_SSUSImaps(strsats, strdates, sourcename)  """
+def calc_HP(ssusi_day):
+    '''
+    Objective: Calculatethe hemispheric poower for a day of SSUSI observations
 
+    Parameters 
+    ----------
+    ssusi_day : pickle
+        Pickle object containing one day of SSUSI EDR aurora data
 
-# ==================== HPI...whats wrong...
+    Returns
+    -------
+    HP : dict
+        dictionary containing:
+        'time'          = list of datetime 
+        'dA'            = list of dA of the integral [km]
+        'hp_calc'       = list of integrated energy flux over spherical area [GW] 
+        'hp_ssusiguvi'  = list of hemispheric power provided in the SSUSI EDR aurora data [GW] 
 
-def HPI_plots(strdates,sat_name,sourcename):
-    # hemispheric power
-    HPI = {'time': [], 'hpi' : []}
+    Examples
+    --------
+    HP = calc_HP(pickled_ssusiday)
 
-    for date_str in strdates:
-        dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
-        pickled_ssusi = pickle_ssusiday(date_str, dirpath)
+    '''
+    # Earth radius [km]
+    r_E = 6378.0 * 1000
 
-        # use ssusi pickle
-        # ----------------
-        for eventtime in pickled_ssusi.keys():
-            ssusi = pickled_ssusi[eventtime]
+    # create dict to store these vals
+    HP = {'time' : [] ,             # datetime 
+          'dA' : []                 # [km] dA of the integral
+          'hp_calc' : [],           # [GW] integrated energy flux over spherical area 
+          'hp_ssusiguvi' : []}      # [GW] hemispheric power provided in the SSUSI EDR aurora data 
 
-            data_point = float(ssusi['HEMISPHERE_POWER_NORTH'])
-            data_time_sec = float(ssusi['TIME'])
-            data_time_dt = dt.datetime.strptime(date_str, '%Y%m%d') + dt.timedelta(seconds=data_time_sec)
+    # now iterate for all times in the ssusi day
+    for ts in ssusi_day.keys():
 
-            # assign HPI to timestamp
-            # -----------------------
-            HPI['time'].append(data_time_dt)
-            HPI['hpi'].append(data_point)
+        # access one timestamp
+        ts_dt = dt.datetime.strptime(ts, '%Y%j%H%M%S') # move this line to the pickle so the pickle keys are datetimes instead fo strings
+        ssusi = ssusi_day[ts]
+        energy_flux = np.array(ssusi['ENERGY_FLUX_NORTH_MAP'])  # units: ergs/s/cm^2
+        
+        # set up and solve the integral
+        integrand = np.zeros((len(energy_flux[:,0])-1,len(energy_flux[0,:])-1))
+        for j in range(0,len(energy_flux[:,0])-1):
+            for i in range(0,len(energy_flux[0,:])-1):
+                r = r_E + np.array(ssusi['HME_NORTH'])[j,i]*1000
+                del_glat = np.abs(glat_try[j,i+1]-glat_try[j,i])*np.pi/180                           
+                del_glon = np.abs(glon_try[j+1,i]-glon_try[j,i])*np.pi/180
+                if 0.0 <= energy_flux[j,i]: # <= maxi
+                    integrand[j,i] = energy_flux[j,i] * 0.001 * r**2 * np.sin(90-glat_try[j,i]*np.pi/180) * del_glat * del_glon                 # convert ergs/s/cm^2 to W/m^2
 
-    HPI_df = pd.DataFrame.from_dict(HPI)
-    HPI_df = HPI_df.sort_values(by='time') # sort chronologically
+        # append vals to our dictionary
+        HP['time'].append(ts_dt)
+        HP['hp_calc'].append(np.sum(integrand)/1.0e9)
+        HP['hp_ssusiguvi'].append(float(ssusi['HEMISPHERE_POWER_NORTH']))
+        HP['dA'].append(r*del_glat*del_glon)
 
-    print(HPI_df)
-    
-    left_date = HPI_df['time'][1]
-    right_date = HPI_df['time'][HPI_df.index[-1]]
-
-    fig, ax = plt.subplots()
-    ax.plot(HPI_df['time'], HPI_df['hpi'],'o-',color='red',label='DMSP-SSUSI')
-    ax.set_title(f'Total Hemispheric Power ({sat_name})')
-
-    ax.set_ylim(bottom=0.0)
-    ax.set_xlim(left=left_date, right=right_date)
-    ax.set_ylabel('GigaWatts')
-    ax.set_xlabel(f'{left_date.strftime('%Y-%m-%d')} to {right_date.strftime('%Y-%m-%d')}')
-    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
-
-    plt.grid(linestyle='--', color='gray', alpha=0.7)
-    plt.legend()
-    plt.savefig(f'figures/hemisphericpower/{left_date.strftime('%Y%m%d_%H%M')}-{right_date.strftime('%Y%m%d_%H%M')}-{sat_name}-HPI.png')
-
-
-# ==================== PICKLING HERE
-# yipee we incorporated pickles
+    return HP
 
 def pickle_ssusiday(date_str, dirpath):
+    '''
+    Objective: Serialize '.nc' data files to Python pickle objects, which allow for efficient storage and de-serialization.
+
+    Parameters
+    ----------
+    date_str : str   
+        Desired date as a string, formatted as 'YYYYMMDD' 
+        where   YYYY is the four-digit year, 
+                MM is a zero-padded month, and 
+                DD is a zero-padded day
+    dirpath : str
+        Path to SSUSI EDR aurora data .nc files for one day
+
+    Returns
+    -------
+    pickled_ssusiday : Python pickle
+        Store a day of SSUSI EDR aurora data into a single pickle. 
+
+    Examples
+    --------
+    # define your desired inputs
+    date_strlist = ['20150623','20150317','20120309','20130317']
+    sat_name = 'f17'
+    sourcename = 'cdaweb'
+
+    # loop through your dates to get your desired pickles
+    for date_str in date_strlist:
+    
+        # find the path of SSUSI EDR aurora data
+        dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+
+        # pickle the data
+        pickled_day = pickle_ssusiday(date_str, dirpath)
+
+    '''
     # MXB NOTE: should a pickle have one dataset (i.e. 1 timestamp in 1 day) or should a pickle have multiple datasets within a day?
     # whole day pickle
-    pklname = f'ssusi_{date_str}.pkl'
+    pklname = f'pickles/ssusi_{date_str}.pkl'
     date_dataset = {}
 
     # each file in the pickle jar
@@ -112,10 +129,11 @@ def pickle_ssusiday(date_str, dirpath):
 
         # get data
         SSUSI_PATH = os.path.join(dirpath, filename) 
-        dataset = xr.open_dataset(SSUSI_PATH)
+        dataset_temp = xr.open_dataset(SSUSI_PATH)
+        dataset = dataset_temp.load()
 
-        # append str day/time to dataset, formatted as 'YYYMMMHHMMSS'
-        date_dataset.update({dataset.STOPPING_TIME : dataset})
+        # append str day/time to dataset, formatted as 'YYYDDDHHMMSS'
+        date_dataset.update({dataset.STARTING_TIME : dataset})
 
     # write into a pickle
     with open(pklname, 'wb') as f:
@@ -131,25 +149,45 @@ def pickle_ssusiday(date_str, dirpath):
     # return the data to be used
     return pickled_ssusiday
 
-def pickle_1ssusi(dirpath, filename):
-    # OBJECTIVE: pickle 1 dataset
-    SSUSI_PATH = os.path.join(dirpath, filename) 
-    dataset = xr.open_dataset(SSUSI_PATH)
+def plot_SSUSImaps(strlist_of_sats, strlist_of_dates, sourcename='cdaweb'):
+    '''
+    Objective: Given a list of satellites and dates, create and save maps of energy flux and mean energy.
 
-    str_timestamp = dataset.STOPPING_TIME
-    pklname = f'ssusi_{str_timestamp}.pkl'
+    Parameters
+    ----------
+    strlist_of_sats : list of string objects
+        List of desired satellites
+        e.g. ['f16', 'f17', 'f18']
+    strlist_of_dates : list of string objects
+        List of desired dates
+        Desired date as a string, formatted as 'YYYYMMDD' 
+        where   YYYY is the four-digit year, 
+                MM is a zero-padded month, and 
+                DD is a zero-padded day
+        e.g. ['20100405', '20220203']
+    sourcename : str
+        Desired data source. 
+        Default is 'cdaweb': download 'nc' from CDAWeb public server.
+        If running locally on mia, data can be sourced from mia backup data
 
-    with open(pklname, 'wb') as f:
-        pickle.dump(dataset, f)
+    Returns
+    -------
+    saves figures at
+        dmsp_tools/figures/energyflux/YYYYMMDD/*.png
+        dmsp_tools/figures/meanenergy/YYYYMMDD/*.png
 
-    f.close() # MXB NOTE: do i need this? will it close auto?
 
-    with open(pklname, 'rb') as file:
-        pickled_1ssusi = pickle.load(file)
-    
-    return pickled_1ssusi
+    Examples
+    --------
+    # name your desired inputs
+    strdates = ['20100405']                 
+    strsats = ['f17','f18']
+    sourcename = 'cdaweb'
 
-def plot_SSUSImaps(strlist_of_sats, strlist_of_dates, sourcename='mia'):
+    # plot ur maps!
+    plot_SSUSImaps(strsats, strdates, sourcename) 
+
+    '''
     for sat_name in strlist_of_sats:
         # loop for each intended satellite
         for date_str in strlist_of_dates: 
@@ -224,27 +262,49 @@ def plot_SSUSImaps(strlist_of_sats, strlist_of_dates, sourcename='mia'):
                     # ------
                     plt.savefig(plotpath + plotname, dpi=150)
                     plt.close() 
+                    # MXB note: i should be returning fig/ax objects
 
             if sourcename == 'cdaweb':
                 # make space
                 os.system(f'rm -r uplodat/{date_str}/')
 
 def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_name):
-    #
-    # OBJECTIVE 
-    # - creates polar plots
-    #
-    # INPUT TYPES 
-    # - array : image, mlat, mlt
-    # - int : maxi, mini
-    # - datetime.datetime : time_stamp
-    # - str : name, cmap_str, unit_str
-    #
-    # OUTPUT TYPES 
-    # - fig : pyplot
-    # 
-    
-    fig=plt.figure()
+    '''
+    Objective: Create well-formatted polar plots for SUSSI applications.
+
+    Parameters
+    ----------
+    image : numpy array
+        2-D array of values to plot
+    mlat, mlt : numpy array
+        Magnetic lat and local time associated with `image`.
+    mini, maxi : float
+        Minimum and maximum values
+    time_stamp : datetime.datetime
+        Starting date and time in UT of recorded data
+    name : string
+        Title of plot
+    cmap_str : string
+        String with Matplotlib choice of colormap. See: https://matplotlib.org/stable/users/explain/colors/colormaps.html 
+    unit_str : string
+        String of data units
+
+    Returns
+    -------
+    MXB note: i should be returning fig/ax objects
+
+    Examples
+    --------
+    # create the polar plot 
+    plot_polar(dataplot,mlat,mlt,maxi,mini,event_dt,title, cmap_str, unit, sat_name)
+
+    # name and save the plot
+    plotname = 'plotname.png'
+    plt.savefig(plotname)
+
+    '''
+
+    fig = plt.figure()
     plt.subplots_adjust(bottom = 0.2,  top = 0.8,
                         wspace = 0.03, hspace = 0.03)
     
@@ -278,27 +338,40 @@ def plot_polar(image,mlat,mlt,maxi,mini,time_stamp,name,cmap_str,unit_str, sat_n
 
     fig.colorbar(hs, cax=ax_cbar, shrink=0.3, label=unit_str)
 
-    return
+    return 
 
-def find_SSUSI_path(date_str, sat_name, sourcename='mia'):
+def find_SSUSI_path(date_str, sat_name, sourcename):
     '''
-    OBJECTIVE
-    - find data from two different sources: mia or cdaweb. 
-    - if mia, output is the path to the mia data
-    - if cdaweb, it will wget cdaweb data and save into uplodat/{date_str}/. then output is the path to the uplodat/{date_str}/ data
+    Objective: Download SSUSI EDR (Environmental Data Record) aurora data from 'cdaweb' public server if run anywhere or 'mia' server if run locally on mia
+    > Downloaded '.nc' files are located in uplodat/{date_str}/ 
 
-    INPUT
-    - date_str : str    
-        e.g. '20100405' : YYYYMMDD format
-    - sat_name : str    
-        e.g. 'f17'
-    - sourcename : str  
-        e.g. 'mia' or 'cdaweb'
+    Parameters
+    ----------
+    date_str : str   
+        Desired date as a string, formatted as 'YYYYMMDD' 
+        where   YYYY is the four-digit year, 
+                MM is a zero-padded month, and 
+                DD is a zero-padded day
+    sat_name : str
+        Desired satellite name ('f17', 'f18', etc.) as a string.
+        See here for data availability: https://docs.google.com/spreadsheets/d/1QyxeKCH3AZUILgoSASgSuJIv4_F9cR3c1689ooKb8dk/edit?gid=0#gid=0 
+    sourcename : str
+        Desired data source. 
+        If 'cdaweb', download 'nc' from CDAWeb public server and save to uplodat/{date_str}
+        If running locally on 'mia', data can be sourced from mia's backup repo
+        
+    Returns
+    -------
+    path_to_dir : str
+        Path to SSUSI EDR aurora data .nc files
+    
+    Examples
+    --------
+    # source the EDR aurora data .nc files
+    dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
 
-    OUTPUT
-    - path_to_dir : str
-        e.g. 'uplodat/{date_str}
     '''
+
     # year and day-of-year
     year = date_str[0:4]   
     datetime_Ymd = dt.datetime.strptime(date_str, '%Y%m%d')
