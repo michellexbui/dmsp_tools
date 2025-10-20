@@ -11,9 +11,12 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
+
 import netCDF4
-import xarray as xr
 from netCDF4 import Dataset
+
+import xarray as xr
+
 import os
 import pickle
 
@@ -24,7 +27,7 @@ def main():
 
 def calc_HP(ssusi_day):
     '''
-    Objective: Calculatethe hemispheric poower for a day of SSUSI observations
+    Objective: Calculatethe hemispheric power for a day of SSUSI observations
 
     Parameters 
     ----------
@@ -413,16 +416,153 @@ def find_SSUSI_path(date_str, sat_name, sourcename):
 
     return path_to_dir
 
+# ==================
+# functions that are more useful for the case study comparison
+# i should probably make a separate .py for case study comparison
+# ==================
+
+def add_circle_boundary(ax):
+    '''
+    Objective: Compute a circle in axes coordinates. Allows us to use a circular boundary for a Cartopy map.
+                Reference for this method: Cartopy always circular stereo example
+                https://scitools.org.uk/cartopy/docs/v0.15/examples/always_circular_stereo.html 
+
+    Parameters
+    ----------
+    ax : Matplotlib axis object
+
+    Returns
+    -------
+    None
+
+    Examples
+    --------
+    # initiate figure
+    fig = plt.figure(figsize=(20,10))
+    ax = fig.add_subplot(1,2,1, projection=ccrs.NorthPolarStereo())
+
+    # add content here
+
+    # finalize figure
+    ax.set_title('Title of the Plot')
+    ax.set_extent([-180, 180, 60, 90], crs=ccrs.PlateCarree())
+    add_circle_boundary(ax)
+
+    '''
+    theta = np.linspace(0, 2*np.pi, 100)
+    center, radius = [0.5, 0.5], 0.5
+    verts = np.vstack([np.sin(theta), np.cos(theta)]).T
+    circle = mpath.Path(verts * radius + center)
+    ax.set_boundary(circle, transform=ax.transAxes)
+
+    return
+
+
+def solar_position(date_UT):
+    '''
+    Objective: Calculate the geographic longitude and latitude point on Earth which the Sun is directly overhead.
+
+    Parameters
+    ----------
+    date_UT : Datetime object
+        A datetime object in Universal Time.
+
+    Returns
+    -------
+    slon, slat : float
+        Geographic longitude and latitude at which the Sun is directly overhead the Earth.
+
+    Examples
+    --------
+    date_UT = datetime.datetime(2010, 4, 5, 9, 30, 0)
+    slon, slat = solar_position(date_UT)
+
+    '''
+    # extract datetime info
+    year = date_UT.year
+    month = date_UT.month
+    day = date_UT.day
+    hour = date_UT.hour
+    minute = date_UT.minute
+    second = date_UT.second
+    
+    # 1. Calculate a Julian Date
+    # ==========================
+    # using Vallado, David (2007) "Fundamentals of Astrodynamics and Applications" Algorithm 14
+    if month < 3:
+        month += 12
+        year -= 1
+
+    B = 2 - year // 100 + (year // 100) // 4
+    C = ((second / 60 + minute) / 60 + hour) / 24
+
+    JD = (int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + B - 1524.5 + C)
+
+    # 2. Calculate the Solar Position
+    # ===============================
+    # centuries from January 2000
+    T_UT1 = (JD(date) - 2451545.0) / 36525
+
+    # solar longitude (deg)
+    lambda_M_sun = (280.460 + 36000.771 * T_UT1) % 360
+
+    # solar anomaly (deg)
+    M_sun = (357.5277233 + 35999.05034 * T_UT1) % 360
+
+    # ecliptic longitude
+    lambda_ecliptic = (lambda_M_sun + 1.914666471 * np.sin(np.deg2rad(M_sun)) +
+                       0.019994643 * np.sin(np.deg2rad(2 * M_sun)))
+
+    # obliquity of the ecliptic (epsilon in Vallado's notation)
+    epsilon = 23.439291 - 0.0130042 * T_UT1
+
+    # declination of the sun
+    slat = np.rad2deg(np.arcsin(np.sin(np.deg2rad(epsilon)) *
+                                     np.sin(np.deg2rad(lambda_ecliptic))))
+
+    # Greenwich mean sidereal time (seconds)
+    theta_GMST = (67310.54841 +
+                  (876600 * 3600 + 8640184.812866) * T_UT1 +
+                  0.093104 * T_UT1**2 -
+                  6.2e-6 * T_UT1**3)
+    # Convert to degrees
+    theta_GMST = (theta_GMST % 86400) / 240
+
+    # Right ascension calculations
+    numerator = (np.cos(np.deg2rad(epsilon)) *
+                 np.sin(np.deg2rad(lambda_ecliptic)) /
+                 np.cos(np.deg2rad(slat)))
+    denominator = (np.cos(np.deg2rad(lambda_ecliptic)) /
+                   np.cos(np.deg2rad(slat)))
+
+    alpha_sun = np.rad2deg(np.arctan2(numerator, denominator))
+
+    # longitude is opposite of Greenwich Hour Angle (GHA)
+    # GHA == theta_GMST - alpha_sun
+    slon = -(theta_GMST - alpha_sun)
+    if slon < -180:
+        slon += 360
+
+    return (slon, slat)    
+
 def dir_exist(path):
     '''
-     OBJECTIVE 
-    - checks if a path to a directory exists. if not, creates that directory.
+     Objective: Checks if a path to a directory exists. If the directory does not exist, then the function creates that directory.
     
-    INPUT 
-    - path : str    e.g. 'figures/energyflux/20100405/'
-                    path to the directory you are intersted in viewing
+    Parameters
+    ----------
+    path : str    
+        Path to desired directory
 
-    OUTPUT (none)
+    Returns
+    -------
+    None
+
+    Example
+    -------
+    path = 'figures/energyflux/20100405/
+    dir_exist(path)
+
     '''
     
     if not os.path.isdir(path):
