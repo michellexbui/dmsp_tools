@@ -1,5 +1,5 @@
 '''
-Objective: Access DMSP SSUSI EDR products and utilize for model validation 
+Objective: Access DMSP SSUSI EDR products
 
 Examples
 --------
@@ -415,6 +415,36 @@ def find_SSUSI_path(date_str, sat_name, sourcename):
         path_to_dir = f'uplodat/{date_str}'
 
     return path_to_dir
+
+def find_val(array_to_search, target_val):
+    '''
+    Objective: Find closest-to-desired value in a 2D data array
+
+    Parameters
+    ----------
+    array_to_search : 2D array
+        Array of data that you would like to search
+    target_val : float
+        Desired value that you are searching for in a large array
+
+    Returns
+    -------
+    row, col : int
+        Row and column index for the desired value
+    
+    Examples
+    --------
+    # find location of a specific value
+    maxi = 20.0
+    row, col = find_val(np.array(ssusi['ENERGY_FLUX_NORTH_MAP']), maxi) 
+
+    '''
+
+    diff_arr = np.abs(array_to_search - target_val)
+    flattened_ind = np.argmin(diff_arr)
+    row, col = np.unravel_index(flattened_ind, diff_arr.shape)
+
+    return row, col
 
 # ==================
 # functions that are more useful for the case study comparison
