@@ -23,7 +23,19 @@ import pickle
 def main():
     # just get the pickle : see example in pickle_ssusiday
     # get ssusi maps : see example in plot_SSUSImaps
+    # define your desired inputs
+    date_strlist = ['20100406']
+    sat_name = 'f17'
+    sourcename = 'cdaweb'
 
+    # loop through your dates to get your desired pickles
+    for date_str in date_strlist:
+    
+        # find the path of SSUSI EDR aurora data
+        dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+
+        # pickle the data
+        pickled_day = pickle_ssusiday(date_str, dirpath)
 
 def calc_HP(ssusi_day):
     '''
@@ -53,7 +65,7 @@ def calc_HP(ssusi_day):
 
     # create dict to store these vals
     HP = {'time' : [] ,             # datetime 
-          'dA' : []                 # [km] dA of the integral
+          'dA' : [],                # [km] dA of the integral
           'hp_calc' : [],           # [GW] integrated energy flux over spherical area 
           'hp_ssusiguvi' : []}      # [GW] hemispheric power provided in the SSUSI EDR aurora data 
 
