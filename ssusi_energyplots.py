@@ -23,19 +23,27 @@ import pickle
 def main():
     # just get the pickle : see example in pickle_ssusiday
     # get ssusi maps : see example in plot_SSUSImaps
-    # define your desired inputs
-    date_strlist = ['20100406']
-    sat_name = 'f17'
+        # name your desired inputs
+    strdates = ['20180129']                 
+    strsats = ['f17']
     sourcename = 'cdaweb'
 
-    # loop through your dates to get your desired pickles
-    for date_str in date_strlist:
+    # plot ur maps!
+    plot_SSUSImaps(strsats, strdates, sourcename)     
     
-        # find the path of SSUSI EDR aurora data
-        dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+    # # define your desired inputs
+    # date_strlist = ['20110926','20110805','20111025','20120308', '20120423', '20120930']
+    # sat_name = 'f17'
+    # sourcename = 'cdaweb'
 
-        # pickle the data
-        pickled_day = pickle_ssusiday(date_str, dirpath)
+    # # loop through your dates to get your desired pickles
+    # for date_str in date_strlist:
+    
+    #     # find the path of SSUSI EDR aurora data
+    #     dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
+
+    #     # pickle the data
+    #     pickled_day = pickle_ssusiday(date_str, dirpath)
 
 def calc_HP(ssusi_day):
     '''
