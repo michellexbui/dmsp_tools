@@ -103,7 +103,7 @@ def calc_HP(ssusi_day):
 
     return HP
 
-def pickle_ssusiday(date_str, dirpath):
+def pickle_ssusiday(date_str, sat_name, dirpath):
     '''
     Objective: Serialize '.nc' data files to Python pickle objects, which allow for efficient storage and de-serialization.
 
@@ -136,12 +136,12 @@ def pickle_ssusiday(date_str, dirpath):
         dirpath = find_SSUSI_path(date_str,sat_name,sourcename)
 
         # pickle the data
-        pickled_day = pickle_ssusiday(date_str, dirpath)
+        pickled_day = pickle_ssusiday(date_str,sat_name, dirpath)
 
     '''
     # MXB NOTE: should a pickle have one dataset (i.e. 1 timestamp in 1 day) or should a pickle have multiple datasets within a day?
     # whole day pickle
-    pklname = f'pickles/ssusi_{date_str}.pkl'
+    pklname = f'pickles/ssusi_{sat_name}_{date_str}.pkl'
     date_dataset = {}
 
     # each file in the pickle jar
